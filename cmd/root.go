@@ -64,9 +64,10 @@ var rootCmd = &cobra.Command{
 				defer wg.Done()
 				defer func() { <-sem }()
 
+				str := utils.RandomString(512)
+
 				startTime := time.Now()
 
-				str := utils.RandomString(512)
 				err := db.SetNewRecord(db.Row{
 					Text: str,
 					Time: time.Now(),
