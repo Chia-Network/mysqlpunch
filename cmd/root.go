@@ -3,6 +3,7 @@ package cmd
 import (
 	"github.com/chia-network/mysqlpunch/internal/utils"
 	log "github.com/sirupsen/logrus"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -27,6 +28,7 @@ var rootCmd = &cobra.Command{
 			log.Fatalf("failed initializing database package, check error and input mysql information: %v", err)
 		}
 
+		// Handle resetting the table
 		reset := viper.GetBool("reset")
 		if reset {
 			err = db.ResetAllRecords()
@@ -36,10 +38,17 @@ var rootCmd = &cobra.Command{
 			log.Info("reset all records successfully")
 		}
 
+		// Set concurrency helpers
 		maxConcurrent := viper.GetUint32("max-concurrent")
 		sem := make(chan struct{}, maxConcurrent)
 		var wg sync.WaitGroup
 
+		// Stat helpers
+		var failedIterations int
+		var durations []time.Duration
+		totalTime := time.Duration(0)
+
+		// Loop through the unumber of records to send
 		numRecords := int(viper.GetUint32("records"))
 		onePercent := int(numRecords / 100)
 		for i := 0; i < numRecords; i++ {
@@ -54,20 +63,67 @@ var rootCmd = &cobra.Command{
 			go func(iteration int) {
 				defer wg.Done()
 				defer func() { <-sem }()
+
+				startTime := time.Now()
+
 				str := utils.RandomString(512)
 				err := db.SetNewRecord(db.Row{
 					Text: str,
 					Time: time.Now(),
 				})
 				if err != nil {
+					failedIterations++
 					log.Warnf("failed to send row on iteration %d, error: %v", iteration, err)
+					return
 				}
+
+				duration := time.Since(startTime)
+				durations = append(durations, duration)
+				totalTime += duration
 			}(i)
 		}
 
 		wg.Wait()
 
 		log.Info("Complete!")
+
+		// Calculate average duration
+		averageDuration := totalTime / time.Duration(numRecords)
+
+		// Calculate minimum duration
+		minDuration := durations[0]
+		for _, dur := range durations {
+			if dur < minDuration {
+				minDuration = dur
+			}
+		}
+
+		// Calculate maximum duration
+		maxDuration := durations[0]
+		for _, dur := range durations {
+			if dur > maxDuration {
+				maxDuration = dur
+			}
+		}
+
+		// Sort the durations slice to calculate median
+		sort.Slice(durations, func(i, j int) bool {
+			return durations[i] < durations[j]
+		})
+
+		// Calculate median duration
+		var medianDuration time.Duration
+		if len(durations)%2 == 0 {
+			medianDuration = (durations[len(durations)/2-1] + durations[len(durations)/2]) / 2
+		} else {
+			medianDuration = durations[len(durations)/2]
+		}
+
+		log.Infof("Average duration: %v\n", averageDuration)
+		log.Infof("Minimum duration: %v\n", minDuration)
+		log.Infof("Maximum duration: %v\n", maxDuration)
+		log.Infof("Median duration: %v\n", medianDuration)
+		log.Infof("Failed to send: %d\n", failedIterations)
 	},
 }
 
