@@ -4,6 +4,7 @@ import (
 	"github.com/chia-network/mysqlpunch/internal/utils"
 	log "github.com/sirupsen/logrus"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/chia-network/mysqlpunch/internal/db"
@@ -26,23 +27,36 @@ var rootCmd = &cobra.Command{
 			log.Fatalf("failed initializing database package, check error and input mysql information: %v", err)
 		}
 
+		maxConcurrent := viper.GetUint32("max-concurrent")
+		sem := make(chan struct{}, maxConcurrent)
+		var wg sync.WaitGroup
+
 		numRecords := int(viper.GetUint32("records"))
 		onePercent := int(numRecords / 100)
 		for i := 0; i < numRecords; i++ {
+			sem <- struct{}{}
+
 			if i%onePercent == 0 {
 				// Send log for every 1% progress
 				log.Infof("Progress: %d%%\n", i/onePercent)
 			}
 
-			str := utils.RandomString(512)
-			err := db.SetNewRecord(db.Row{
-				Text: str,
-				Time: time.Now(),
-			})
-			if err != nil {
-				log.Warnf("failed to send row on iteration %d, error: %v", i, err)
-			}
+			wg.Add(1)
+			go func(iteration int) {
+				defer wg.Done()
+				defer func() { <-sem }()
+				str := utils.RandomString(512)
+				err := db.SetNewRecord(db.Row{
+					Text: str,
+					Time: time.Now(),
+				})
+				if err != nil {
+					log.Warnf("failed to send row on iteration %d, error: %v", iteration, err)
+				}
+			}(i)
 		}
+
+		wg.Wait()
 
 		log.Info("Complete!")
 	},
@@ -67,6 +81,7 @@ func init() {
 	rootCmd.PersistentFlags().String("mysql-user", "", "A mysql username to authenticate as, requires a password, see the `--mysql-password` flag")
 	rootCmd.PersistentFlags().String("mysql-password", "", "A password for the corresponding mysql username, see the `--mysql-user` flag")
 	rootCmd.PersistentFlags().Uint32("records", 0, "The number of records to send (defaults to 0)")
+	rootCmd.PersistentFlags().Uint32("max-concurrent", 1, "The max number of records to send concurrently (in individual requests.) (defaults to 1)")
 
 	err := viper.BindPFlag("log-level", rootCmd.PersistentFlags().Lookup("log-level"))
 	if err != nil {
@@ -94,6 +109,11 @@ func init() {
 	}
 
 	err = viper.BindPFlag("records", rootCmd.PersistentFlags().Lookup("records"))
+	if err != nil {
+		log.Fatalln(err.Error())
+	}
+
+	err = viper.BindPFlag("max-concurrent", rootCmd.PersistentFlags().Lookup("max-concurrent"))
 	if err != nil {
 		log.Fatalln(err.Error())
 	}
