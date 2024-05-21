@@ -16,18 +16,30 @@ var db *sql.DB
 // Init accepts authentication parameters for a mysql db and creates a client
 // This function may also be configured to create tables in the db on behalf of the application for setup purposes.
 func Init(createDB bool, host, database, user, passwd string) error {
-	// Create db client
-	var err error
-	db, err = sql.Open("mysql", assembleDataSourceName(host, database, user, passwd))
-	if err != nil {
-		return fmt.Errorf("creating database client: %v", err)
+	// Create the db if the create-db flag was given on the command line
+	if createDB {
+		// Create db client for creating the initial db -- this client doesn't specify a db in the DSN
+		client, err := sql.Open("mysql", assembleDataSourceName(host, user, passwd, ""))
+		if err != nil {
+			return fmt.Errorf("creating database client: %v", err)
+		}
+
+		_, err = client.Exec(fmt.Sprintf(`CREATE DATABASE IF NOT EXISTS %s;`, database))
+		if err != nil {
+			return fmt.Errorf("creating creating %s database (if it didn't exist): %v", database, err)
+		}
+
+		err = client.Close()
+		if err != nil {
+			log.Warnf("failed to close db client for creating the initial database, see original error message: %v", err)
+		}
 	}
 
-	if createDB {
-		_, err = db.Exec(`CREATE DATABASE IF NOT EXISTS mysqlpunch;`)
-		if err != nil {
-			return fmt.Errorf("creating creating mysqlpunch database (if it didn't exist): %v", err)
-		}
+	// Create db client -- this client includes the database name in the DSN so we don't need to select it in subsequent queries
+	var err error
+	db, err = sql.Open("mysql", assembleDataSourceName(host, user, passwd, database))
+	if err != nil {
+		return fmt.Errorf("creating database client: %v", err)
 	}
 
 	log.Debug("Creating table in mysql db if they don't already exist")
@@ -42,7 +54,10 @@ func Init(createDB bool, host, database, user, passwd string) error {
 	return nil
 }
 
-func assembleDataSourceName(host, database, user, passwd string) string {
+func assembleDataSourceName(host, user, passwd, database string) string {
+	if database == "" {
+		return fmt.Sprintf("%s:%s@tcp(%s)/?parseTime=true", user, passwd, host)
+	}
 	return fmt.Sprintf("%s:%s@tcp(%s)/%s?parseTime=true", user, passwd, host, database)
 }
 
