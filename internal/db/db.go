@@ -26,7 +26,7 @@ func Init(createDB bool, host, database, user, passwd string) error {
 
 		_, err = client.Exec(fmt.Sprintf(`CREATE DATABASE IF NOT EXISTS %s;`, database))
 		if err != nil {
-			return fmt.Errorf("creating creating %s database (if it didn't exist): %v", database, err)
+			return fmt.Errorf("creating %s database (if it didn't exist): %v", database, err)
 		}
 
 		err = client.Close()

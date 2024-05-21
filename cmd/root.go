@@ -49,7 +49,7 @@ var rootCmd = &cobra.Command{
 		var durations []time.Duration
 		totalTime := time.Duration(0)
 
-		// Loop through the unumber of records to send
+		// Loop through the number of records to send
 		numRecords := int(viper.GetUint32("records"))
 		onePercent := int(numRecords / 100)
 		for i := 0; i < numRecords; i++ {
@@ -142,14 +142,14 @@ func init() {
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 	viper.AutomaticEnv()
 
-	rootCmd.PersistentFlags().String("log-level", "info", "How verbose the logs should be. panic, fatal, error, warn, info, debug, trace (default: info)")
-	rootCmd.PersistentFlags().String("mysql-host", "", "The hostname to connect to for the mysql db")
-	rootCmd.PersistentFlags().String("mysql-database", "", "The mysql database to use")
-	rootCmd.PersistentFlags().String("mysql-user", "", "A mysql username to authenticate as, requires a password, see the `--mysql-password` flag")
-	rootCmd.PersistentFlags().String("mysql-password", "", "A password for the corresponding mysql username, see the `--mysql-user` flag")
-	rootCmd.PersistentFlags().Uint32("records", 0, "The number of records to send (defaults to 0)")
-	rootCmd.PersistentFlags().Uint32("max-concurrent", 1, "The max number of records to send concurrently (in individual requests.) (defaults to 1)")
-	rootCmd.PersistentFlags().Bool("reset", false, "This resets the mysqlpunch table at the beginning of a run, deleting all records in it and resetting the ID counter. (defaults to false)")
+	rootCmd.PersistentFlags().String("log-level", "info", "Log verbosity. Should be one of: panic, fatal, error, warn, info, debug, trace.")
+	rootCmd.PersistentFlags().String("mysql-host", "", "The hostname to connect to for the mysql db.")
+	rootCmd.PersistentFlags().String("mysql-database", "", "The mysql database to use.")
+	rootCmd.PersistentFlags().String("mysql-user", "", "A mysql username to authenticate as, requires a password, see the --mysql-password flag.")
+	rootCmd.PersistentFlags().String("mysql-password", "", "A password for the corresponding mysql username, see the --mysql-user flag.")
+	rootCmd.PersistentFlags().Uint32("records", 0, "The number of rows or records to send.")
+	rootCmd.PersistentFlags().Uint32("max-concurrent", 1, "The max number of records to send concurrently (in individual requests.)")
+	rootCmd.PersistentFlags().Bool("reset", false, "When set to true, this resets the mysqlpunch table at the beginning of a run, deleting all records in it and resetting the ID counter. (defaults to false)")
 	rootCmd.PersistentFlags().Bool("create-db", false, "When set to true, this will handle creating the database in your mysql server. (defaults to false)")
 
 	err := viper.BindPFlag("log-level", rootCmd.PersistentFlags().Lookup("log-level"))
