@@ -15,12 +15,19 @@ var db *sql.DB
 
 // Init accepts authentication parameters for a mysql db and creates a client
 // This function may also be configured to create tables in the db on behalf of the application for setup purposes.
-func Init(host, database, user, passwd string) error {
+func Init(createDB bool, host, database, user, passwd string) error {
 	// Create db client
 	var err error
 	db, err = sql.Open("mysql", assembleDataSourceName(host, database, user, passwd))
 	if err != nil {
 		return fmt.Errorf("creating database client: %v", err)
+	}
+
+	if createDB {
+		_, err = db.Exec(`CREATE DATABASE IF NOT EXISTS mysqlpunch;`)
+		if err != nil {
+			return fmt.Errorf("creating creating mysqlpunch database (if it didn't exist): %v", err)
+		}
 	}
 
 	log.Debug("Creating table in mysql db if they don't already exist")
