@@ -19,6 +19,7 @@ var rootCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		// Init db package
 		err := db.Init(
+			viper.GetBool("create-db"),
 			viper.GetString("mysql-host"),
 			viper.GetString("mysql-database"),
 			viper.GetString("mysql-user"),
@@ -149,6 +150,7 @@ func init() {
 	rootCmd.PersistentFlags().Uint32("records", 0, "The number of records to send (defaults to 0)")
 	rootCmd.PersistentFlags().Uint32("max-concurrent", 1, "The max number of records to send concurrently (in individual requests.) (defaults to 1)")
 	rootCmd.PersistentFlags().Bool("reset", false, "This resets the mysqlpunch table at the beginning of a run, deleting all records in it and resetting the ID counter. (defaults to false)")
+	rootCmd.PersistentFlags().Bool("create-db", false, "When set to true, this will handle creating the database in your mysql server. (defaults to false)")
 
 	err := viper.BindPFlag("log-level", rootCmd.PersistentFlags().Lookup("log-level"))
 	if err != nil {
@@ -186,6 +188,11 @@ func init() {
 	}
 
 	err = viper.BindPFlag("reset", rootCmd.PersistentFlags().Lookup("reset"))
+	if err != nil {
+		log.Fatalln(err.Error())
+	}
+
+	err = viper.BindPFlag("create-db", rootCmd.PersistentFlags().Lookup("create-db"))
 	if err != nil {
 		log.Fatalln(err.Error())
 	}
